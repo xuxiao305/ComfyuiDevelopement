@@ -1,0 +1,22 @@
+[cuda]
+packages = ["cc_torch", "torch_generic_nms", "flash-attn"]
+
+[pypi-dependencies]
+safetensors = ">=0.4.0"
+timm = "*"
+ftfy = "*"
+regex = "*"
+iopath = "*"
+huggingface_hub = "*"
+einops = "*"
+opencv-python = "*"
+psutil = "*"
+pycocotools = "*"
+scikit-image = "*"
+numpy = "*"
+pillow = "*"
+tqdm = "*"
+typing_extensions = "*"
+av = "*"
+comfy-aimdo = "*"
+comfy-kitchen = "*"

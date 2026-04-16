@@ -1,0 +1,7 @@
+[node_reqs]
+ComfyUI-VideoHelperSuite = "Kosinkadink/ComfyUI-VideoHelperSuite"
+ComfyUI-Multiband = "PozzettiAndrea/ComfyUI-Multiband"
+ComfyUI-Env-Manager = "PozzettiAndrea/ComfyUI-Env-Manager"
+
+[brew]
+packages = ["ffmpeg"]

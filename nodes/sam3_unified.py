@@ -177,8 +177,9 @@ class SAM3TextClickCollector(io.ComfyNode):
             pos_boxes = len(prompt["positive_boxes"]["boxes"])
             neg_boxes = len(prompt["negative_boxes"]["boxes"])
             text = prompt["text_prompt"]
+            text_suffix = f', text="{text}"' if text else ''
             log.info(f"  Region {idx}: {pos_pts}+{neg_pts} pts, {pos_boxes}+{neg_boxes} boxes"
-                     f"{f', text=\"{text}\"' if text else ''}")
+                     f"{text_suffix}")
 
             # Include region if it has any content (geometry or text)
             has_geometry = (pos_pts or neg_pts or pos_boxes or neg_boxes)
@@ -247,6 +248,10 @@ class SAM3TextClickSegmentation(io.ComfyNode):
                              tooltip="Refinement passes per region (feeds mask back for cleaner edges)"),
                 io.Boolean.Input("use_multimask", default=False, optional=True,
                                  tooltip="Generate 3 mask candidates per interactive region"),
+                io.Combo.Input("vis_mode", default="box+fill",
+                               options=["box+fill", "box_only", "fill_only"], optional=True,
+                               tooltip="Visualization mode: box+fill = boxes and colored overlay, "
+                                       "box_only = bounding boxes only, fill_only = colored overlay only"),
             ],
             outputs=[
                 io.Mask.Output(display_name="masks"),
@@ -257,7 +262,7 @@ class SAM3TextClickSegmentation(io.ComfyNode):
     @classmethod
     def execute(cls, sam3_model_config, image, multi_prompts,
                 confidence_threshold=0.2, refinement_iterations=0,
-                use_multimask=False):
+                use_multimask=False, vis_mode="box+fill"):
         """
         Perform unified multi-region segmentation.
         """
@@ -278,7 +283,7 @@ class SAM3TextClickSegmentation(io.ComfyNode):
         pil_image = comfy_image_to_pil(image)
         img_w, img_h = pil_image.size
         log.info(f"[UnifiedSeg] Image size: {pil_image.size}")
-        log.info(f"[UnifiedSeg] Processing {len(multi_prompts)} prompt regions")
+        log.info(f"[UnifiedSeg] Processing {len(multi_prompts)} prompt regions, vis_mode={vis_mode}")
 
         if len(multi_prompts) == 0:
             empty_mask = torch.zeros(1, img_h, img_w)
@@ -354,10 +359,12 @@ class SAM3TextClickSegmentation(io.ComfyNode):
             empty_mask = torch.zeros(1, img_h, img_w)
             return io.NodeOutput(empty_mask, pil_to_comfy_image(pil_image))
 
-        # Stack all masks
-        masks = torch.stack(all_masks, dim=0)  # [N, H, W]
+        # Stack all masks and ensure 3D [N, H, W]
+        masks = torch.stack(all_masks, dim=0)  # may be [N, 1, H, W] or [N, H, W]
+        while masks.ndim > 3:
+            masks = masks.squeeze(1)  # remove channel dim → [N, H, W]
         scores = torch.tensor(all_scores)
-        log.info(f"[UnifiedSeg] Generated {masks.shape[0]} masks")
+        log.info(f"[UnifiedSeg] Generated {masks.shape[0]} masks, mask shape: {masks.shape}")
 
         # Compute bounding boxes for visualization
         boxes_list = []
@@ -374,7 +381,7 @@ class SAM3TextClickSegmentation(io.ComfyNode):
         boxes = torch.tensor(boxes_list).float()
 
         comfy_masks = masks_to_comfy_mask(masks)
-        vis_image = visualize_masks_on_image(pil_image, masks, boxes, scores, alpha=0.5)
+        vis_image = visualize_masks_on_image(pil_image, masks, boxes, scores, alpha=0.5, vis_mode=vis_mode)
         vis_tensor = pil_to_comfy_image(vis_image)
 
         # Cleanup
